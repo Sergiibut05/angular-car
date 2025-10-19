@@ -27,7 +27,7 @@ jobs:
 
     # 4️⃣ Construye la app Angular en modo producción
     - name: Build Angular app
-      run: npm run build -- --configuration production --output-path=dist/angular-car/browser --base-href "/angular-car/"
+      run: ng build --configuration production --output-path=dist/angular-car --base-href "/angular-car/"
 
     # 5️⃣ Publica en GitHub Pages usando la rama gh-pages
     - name: Deploy to GitHub Pages
