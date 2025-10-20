@@ -115,7 +115,11 @@ export class VehicleController {
     // ===========================================
     // 🏗️ CREAR CUERPO FÍSICO DEL CHASIS
     // ===========================================
-    const halfExtents = new CANNON.Vec3(0.9, 0.4, 2.1); // Dimensiones del chasis (ancho, alto, largo)
+    const halfExtents = new CANNON.Vec3(
+      VEHICLE_CONFIG.CHASSIS_HALF_WIDTH,
+      VEHICLE_CONFIG.CHASSIS_HALF_HEIGHT,
+      VEHICLE_CONFIG.CHASSIS_HALF_LENGTH
+    ); // Dimensiones del chasis (ancho, alto, largo) - Nuevo modelo
     this.chassisBody = new CANNON.Body({ 
       mass: this.chassisMass, // Masa del chasis (kg)
       material: chassisMaterial, // Material físico del chasis
@@ -151,12 +155,12 @@ export class VehicleController {
     // ===========================================
     // 🛞 POSICIONES DE LAS RUEDAS
     // ===========================================
-    // Posiciones relativas al centro del chasis (en metros)
+    // Posiciones relativas al centro del chasis (en metros) - Ajustadas para nuevo modelo
     const wheelPositions = [
-        [-0.77, 0, 1.7],   // Rueda delantera izquierda
-        [0.77, 0, 1.7],    // Rueda delantera derecha
-        [-0.77, 0, -0.8],  // Rueda trasera izquierda
-        [0.77, 0, -0.8]    // Rueda trasera derecha
+        [-2.3, 0, 0.8],   // Rueda delantera izquierda
+        [2.3, 0, 0.8],    // Rueda delantera derecha
+        [-2.3, 0, -0.8],  // Rueda trasera izquierda
+        [2.3, 0, -0.8]    // Rueda trasera derecha
     ];
 
     // ===========================================

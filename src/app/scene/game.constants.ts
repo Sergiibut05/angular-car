@@ -52,6 +52,11 @@ export const VEHICLE_CONFIG = {
   LINEAR_DAMPING: 0.15,
   ANGULAR_DAMPING: 0.2,
   
+  // 🏗️ DIMENSIONES DEL CHASIS (Nuevo modelo)
+  CHASSIS_HALF_WIDTH: 2.865,   // X (ancho/2) - 5.73m total
+  CHASSIS_HALF_HEIGHT: 1.345,  // Y (alto/2) - 2.69m total  
+  CHASSIS_HALF_LENGTH: 1.14,   // Z (largo/2) - 2.28m total
+  
   // Ruedas
   WHEEL_RADIUS: 0.38,
   SUSPENSION_STIFFNESS: 60,
