@@ -1,1 +1,21 @@
 <canvas #rendererCanvas></canvas>
+
+<!-- Controles móviles -->
+<div class="mobile-controls" *ngIf="isMobile">
+  <!-- Joystick para dirección (izquierda abajo) -->
+  <div class="joystick-container" #joystickContainer>
+    <div class="joystick-base">
+      <div class="joystick-knob" #joystickKnob></div>
+    </div>
+  </div>
+
+  <!-- Botones de acelerar/frenar (derecha abajo) -->
+  <div class="mobile-buttons">
+    <button class="mobile-btn accelerate-btn" #accelerateBtn>
+      <span>▲</span>
+    </button>
+    <button class="mobile-btn brake-btn" #brakeBtn>
+      <span>▼</span>
+    </button>
+  </div>
+</div>

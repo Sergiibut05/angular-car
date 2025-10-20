@@ -47,12 +47,16 @@ export class WorldController {
 
   // 🏠 Crear suelo infinito (visual y físico)
   private createInfiniteGround(): void {
-    // Suelo visual infinito
+    // Suelo visual infinito con gradiente profesional
     const groundGeometry = new THREE.PlaneGeometry(1000, 1000);
-    const groundMaterial = new THREE.MeshLambertMaterial({ 
-      color: 0xF5E6D3, // Beige pastel
-      transparent: true,
-      opacity: 0.9
+    
+    // Material con gradiente azul simple
+    const groundMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xBBDEFB, // Azul medio como color base
+      roughness: 0.5, // Rugosidad media para textura plástica
+      metalness: 0.0, // Sin metalicidad
+      transparent: false,
+      opacity: 1.0
     });
     
     const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);

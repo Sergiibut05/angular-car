@@ -3,3 +3,149 @@ canvas {
     top: 0;
     left: 0;
 }
+
+// ===========================================
+// 📱 CONTROLES MÓVILES
+// ===========================================
+.mobile-controls {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none; // Permitir interacción con el canvas
+    z-index: 1000;
+}
+
+// 🎮 JOYSTICK (esquina inferior izquierda)
+.joystick-container {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 120px;
+    height: 120px;
+    pointer-events: auto;
+}
+
+.joystick-base {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 3px solid rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.joystick-knob {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.8);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    position: absolute;
+    transition: transform 0.1s ease;
+    cursor: grab;
+    
+    &:active {
+        cursor: grabbing;
+        transform: scale(1.1);
+    }
+}
+
+// 🎯 BOTONES (esquina inferior derecha)
+.mobile-buttons {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    pointer-events: auto;
+}
+
+.mobile-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.2);
+    border: 3px solid rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    
+    span:first-child {
+        font-size: 24px;
+        margin-bottom: 0;
+    }
+    
+    span:last-child {
+        display: none; // Ocultar texto ya que solo usamos símbolos
+    }
+    
+    &:active {
+        transform: scale(0.95);
+        background: rgba(255, 255, 255, 0.4);
+    }
+}
+
+.accelerate-btn {
+    &:active {
+        background: rgba(0, 255, 0, 0.3);
+        border-color: rgba(0, 255, 0, 0.6);
+    }
+}
+
+.brake-btn {
+    &:active {
+        background: rgba(255, 0, 0, 0.3);
+        border-color: rgba(255, 0, 0, 0.6);
+    }
+}
+
+// 📱 RESPONSIVE
+@media (max-width: 768px) {
+    .joystick-container {
+        width: 100px;
+        height: 100px;
+        bottom: 15px;
+        left: 15px;
+    }
+    
+    .joystick-knob {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .mobile-buttons {
+        bottom: 15px;
+        right: 15px;
+        gap: 12px;
+    }
+    
+    .mobile-btn {
+        width: 70px;
+        height: 70px;
+        font-size: 10px;
+        
+        span:first-child {
+            font-size: 20px;
+        }
+        
+        span:last-child {
+            display: none;
+        }
+    }
+}

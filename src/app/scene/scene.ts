@@ -1,12 +1,13 @@
 // scene.ts
 
-import { Component, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, ElementRef, ViewChild, AfterViewInit, ChangeDetectorRef } from '@angular/core';
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { GLTFLoader } from 'three-stdlib';
 import { VehicleController, chassisMaterial } from './vehicle.controller';
 // import { OrbitControls } from 'three-stdlib'; // --- ARREGLO: ELIMINADO ---
 import { WorldController, worldMaterial } from './world.controller';
+import { CommonModule, NgIf } from '@angular/common';
 
 
 // --- ARREGLO: Imports para Post-Procesado (Desenfoque) ---
@@ -15,17 +16,28 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 // ---------------------------------------------------------
 
+
 @Component({
   selector: 'app-scene',
   templateUrl: './scene.html',
   styleUrls: ['./scene.scss'],
-  // imports: [], // Asegúrate de que esto esté bien en tu proyecto Angular
+  imports: [CommonModule], 
   // standalone: true, 
 })
 export class Scene implements AfterViewInit {
 
   @ViewChild('rendererCanvas', { static: true })
   rendererCanvas!: ElementRef<HTMLCanvasElement>;
+  
+  // Referencias para controles móviles
+  @ViewChild('joystickContainer', { static: false })
+  joystickContainer!: ElementRef<HTMLDivElement>;
+  @ViewChild('joystickKnob', { static: false })
+  joystickKnob!: ElementRef<HTMLDivElement>;
+  @ViewChild('accelerateBtn', { static: false })
+  accelerateBtn!: ElementRef<HTMLButtonElement>;
+  @ViewChild('brakeBtn', { static: false })
+  brakeBtn!: ElementRef<HTMLButtonElement>;
   
   private worldController!: WorldController;
   vehicle!: VehicleController;
@@ -60,11 +72,38 @@ export class Scene implements AfterViewInit {
   
   // Controles del coche
   private keys: { [key: string]: boolean } = {};
-  // -----------------------------------------------
+  
+  // ===========================================
+  // 📱 DETECCIÓN MÓVIL Y CONTROLES TÁCTILES
+  // ===========================================
+  isMobile = false; // Detecta si es dispositivo móvil
+  
+  // Variables del joystick
+  private joystickActive = false;
+  private joystickCenter = { x: 0, y: 0 };
+  private joystickMaxDistance = 50;
+  private joystickDirection = { x: 0, y: 0 };
+  
+  // Estados de botones móviles
+  private mobileAccelerate = false;
+  private mobileBrake = false;
+
+  constructor(private cdr: ChangeDetectorRef) {}
 
   ngAfterViewInit(): void {
     this.initScene();
     this.initCameraControls(); // Inicializa los listeners de la nueva cámara
+    
+    // Detectar si es dispositivo móvil (usar setTimeout para evitar error Angular)
+    setTimeout(() => {
+      this.detectMobile();
+      this.cdr.detectChanges();
+      
+      // Inicializar controles móviles si es necesario
+      if (this.isMobile) {
+        this.initMobileControls();
+      }
+    }, 0);
 
     // Iniciar el bucle de animación
     this.animate();
@@ -131,34 +170,54 @@ export class Scene implements AfterViewInit {
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Suavizado de sombras
+    this.renderer.shadowMap.autoUpdate = true; // Actualización automática
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
 
-    // Iluminación profesional y confortable
-    const sunLight = new THREE.DirectionalLight(0xfff8dc, 1.8); // Luz cálida y suave
-    sunLight.position.set(25, 35, 15); // Posición del sol
+    // ===========================================
+    // 🌞 CONFIGURACIÓN AVANZADA DE SOMBRAS
+    // ===========================================
+    const sunLight = new THREE.DirectionalLight(0xFFE4B5, 2.2); // Color sol más cálido
+    sunLight.position.set(30, 40, 20); // Posición del sol más alta
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 4096; 
-    sunLight.shadow.mapSize.height = 4096;
+    
+    // 🎯 RESOLUCIÓN ULTRA ALTA DE SOMBRAS
+    sunLight.shadow.mapSize.width = 16384; // Resolución máxima
+    sunLight.shadow.mapSize.height = 16384;
+    
+    // 📐 CONFIGURACIÓN DE CÁMARA DE SOMBRAS
     sunLight.shadow.camera.near = 0.1;
-    sunLight.shadow.camera.far = 200;
-    sunLight.shadow.camera.left = -80; 
-    sunLight.shadow.camera.right = 80;
-    sunLight.shadow.camera.top = 80;
-    sunLight.shadow.camera.bottom = -80;
-    sunLight.shadow.bias = -0.0005; // Reducir artefactos de sombra
-    sunLight.shadow.normalBias = 0.02; // Suavizar sombras
+    sunLight.shadow.camera.far = 500; // Mayor rango
+    sunLight.shadow.camera.left = -150; // Área más amplia
+    sunLight.shadow.camera.right = 150;
+    sunLight.shadow.camera.top = 150;
+    sunLight.shadow.camera.bottom = -150;
+    
+    // 🎨 FILTROS DE SUAVIZADO AVANZADOS
+    sunLight.shadow.bias = -0.00005; // Bias muy pequeño para reducir artefactos
+    sunLight.shadow.normalBias = 0.08; // Normal bias aumentado para suavizar bordes
+    sunLight.shadow.radius = 12; // Radio de suavizado aumentado
+    
+    // 🔧 CONFIGURACIÓN ADICIONAL PARA CALIDAD
+    sunLight.shadow.blurSamples = 25; // Más muestras para mejor calidad
+    sunLight.shadow.updateMatrices(sunLight); // Actualizar matrices
+
     this.scene.add(sunLight);
 
-    // Luz de relleno suave
-    const fillLight = new THREE.DirectionalLight(0x87CEEB, 0.4); // Azul cielo suave
-    fillLight.position.set(-15, 20, -10);
+    // Luz de relleno del cielo
+    const fillLight = new THREE.DirectionalLight(0xB0E0E6, 0.6); // Azul cielo más suave
+    fillLight.position.set(-20, 25, -15);
     this.scene.add(fillLight);
 
-    // Luz ambiental cálida
-    const ambientLight = new THREE.AmbientLight(0xfff5e6, 0.6); // Ambiente cálido
+    // Luz ambiental cálida y suave
+    const ambientLight = new THREE.AmbientLight(0xFFF8DC, 0.8); // Ambiente más cálido
     this.scene.add(ambientLight);
+
+    // Luz adicional para suavizar sombras
+    const rimLight = new THREE.DirectionalLight(0xFFF5E6, 0.3);
+    rimLight.position.set(10, 15, -20);
+    this.scene.add(rimLight);
 
     // Mundo físico
     this.world = new CANNON.World();
@@ -184,9 +243,9 @@ export class Scene implements AfterViewInit {
     this.composer.addPass(renderPass);
 
     this.bokehPass = new BokehPass(this.scene, this.camera, {
-      focus: 20.0,      // Distancia de enfoque
-      aperture: 0.00001, // Desenfoque muy sutil
-      maxblur: 0.0005,   // Desenfoque máximo muy pequeño (solo bordes)
+      focus: 25.0,      // Distancia de enfoque aumentada
+      aperture: 0.00005, // Desenfoque más notable
+      maxblur: 0.002,   // Desenfoque máximo más visible en bordes
       width: window.innerWidth,
       height: window.innerHeight
     } as any);
@@ -196,14 +255,128 @@ export class Scene implements AfterViewInit {
 
   // --- ARREGLO: Listeners para la nueva cámara ---
   private initCameraControls(): void {
+    // Eventos de mouse (desktop)
     this.renderer.domElement.addEventListener('wheel', this.onMouseWheel.bind(this), { passive: false });
     this.renderer.domElement.addEventListener('mousedown', this.onMouseDown.bind(this));
     window.addEventListener('mousemove', this.onMouseMove.bind(this));
     window.addEventListener('mouseup', this.onMouseUp.bind(this));
     
+    // Eventos táctiles (móvil) para controles de cámara
+    this.renderer.domElement.addEventListener('touchstart', this.onTouchStart.bind(this), { passive: false });
+    this.renderer.domElement.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
+    this.renderer.domElement.addEventListener('touchend', this.onTouchEnd.bind(this), { passive: false });
+    
     // Listeners de teclado para detectar conducción
     window.addEventListener('keydown', (e) => (this.keys[e.key.toLowerCase()] = true));
     window.addEventListener('keyup', (e) => (this.keys[e.key.toLowerCase()] = false));
+  }
+
+  // ===========================================
+  // 📱 DETECCIÓN Y CONTROLES MÓVILES
+  // ===========================================
+  private detectMobile(): void {
+    // Detectar dispositivo móvil por User Agent y tamaño de pantalla
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+    const isMobileSize = window.innerWidth <= 768 || window.innerHeight <= 768;
+    
+    this.isMobile = isMobileUA || isMobileSize;
+    console.log(`📱 Dispositivo móvil detectado: ${this.isMobile}`);
+  }
+
+  private initMobileControls(): void {
+    if (!this.joystickContainer || !this.joystickKnob) return;
+    
+    // Configurar joystick
+    this.setupJoystick();
+    
+    // Configurar botones
+    this.setupMobileButtons();
+  }
+
+  private setupJoystick(): void {
+    const container = this.joystickContainer.nativeElement;
+    const knob = this.joystickKnob.nativeElement;
+    
+    // Obtener posición central del joystick
+    const rect = container.getBoundingClientRect();
+    this.joystickCenter = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    };
+    
+    // Eventos táctiles
+    knob.addEventListener('touchstart', this.onJoystickStart.bind(this), { passive: false });
+    knob.addEventListener('touchmove', this.onJoystickMove.bind(this), { passive: false });
+    knob.addEventListener('touchend', this.onJoystickEnd.bind(this), { passive: false });
+    
+    // Eventos de mouse (para testing en desktop) - Mejorados
+    knob.addEventListener('mousedown', this.onJoystickStart.bind(this));
+    document.addEventListener('mousemove', this.onJoystickMove.bind(this));
+    document.addEventListener('mouseup', this.onJoystickEnd.bind(this));
+  }
+
+  private setupMobileButtons(): void {
+    if (!this.accelerateBtn || !this.brakeBtn) return;
+    
+    // Botón acelerar
+    this.accelerateBtn.nativeElement.addEventListener('touchstart', () => {
+      this.mobileAccelerate = true;
+    }, { passive: false });
+    this.accelerateBtn.nativeElement.addEventListener('touchend', () => {
+      this.mobileAccelerate = false;
+    }, { passive: false });
+    
+    // Botón frenar
+    this.brakeBtn.nativeElement.addEventListener('touchstart', () => {
+      this.mobileBrake = true;
+    }, { passive: false });
+    this.brakeBtn.nativeElement.addEventListener('touchend', () => {
+      this.mobileBrake = false;
+    }, { passive: false });
+  }
+
+  private onJoystickStart(event: TouchEvent | MouseEvent): void {
+    this.joystickActive = true;
+    event.preventDefault();
+  }
+
+  private onJoystickMove(event: TouchEvent | MouseEvent): void {
+    if (!this.joystickActive) return;
+    
+    event.preventDefault();
+    
+    const clientX = 'touches' in event ? event.touches[0].clientX : event.clientX;
+    const clientY = 'touches' in event ? event.touches[0].clientY : event.clientY;
+    
+    // Calcular dirección del joystick
+    const deltaX = clientX - this.joystickCenter.x;
+    const deltaY = clientY - this.joystickCenter.y;
+    
+    // Limitar distancia máxima
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    const limitedDistance = Math.min(distance, this.joystickMaxDistance);
+    
+    // Calcular dirección normalizada
+    this.joystickDirection = {
+      x: limitedDistance > 0 ? (deltaX / distance) * (limitedDistance / this.joystickMaxDistance) : 0,
+      y: limitedDistance > 0 ? (deltaY / distance) * (limitedDistance / this.joystickMaxDistance) : 0
+    };
+    
+    // Mover knob visualmente
+    const knob = this.joystickKnob.nativeElement;
+    knob.style.transform = `translate(${this.joystickDirection.x * this.joystickMaxDistance}px, ${this.joystickDirection.y * this.joystickMaxDistance}px)`;
+  }
+
+  private onJoystickEnd(event: TouchEvent | MouseEvent): void {
+    this.joystickActive = false;
+    this.joystickDirection = { x: 0, y: 0 };
+    
+    // Resetear posición del knob
+    const knob = this.joystickKnob.nativeElement;
+    knob.style.transform = 'translate(0px, 0px)';
+    
+    event.preventDefault();
   }
 
   private onMouseWheel(event: WheelEvent): void {
@@ -230,9 +403,14 @@ export class Scene implements AfterViewInit {
     this.lastMouseX = event.clientX;
     this.lastMouseY = event.clientY;
     
-    // Paneo isométrico corregido: invertir direcciones para movimiento natural
-    this.cameraPanOffset.x += deltaX * 0.08; // Mouse izquierda -> cámara derecha (invertido)
-    this.cameraPanOffset.z -= deltaY * 0.08; // Mouse arriba -> cámara arriba, mouse abajo -> cámara abajo
+    // Compensación trigonométrica para movimiento más "recto" en vista isométrica
+    const angle = Math.PI / 4; // Ángulo de la vista isométrica
+    const compensatedX = deltaY * Math.cos(angle) - deltaX * Math.sin(angle);
+    const compensatedZ = deltaY * Math.sin(angle) + deltaX * Math.cos(angle);
+    
+    // Aplicar movimiento compensado
+    this.cameraPanOffset.x += compensatedX * 0.02;
+    this.cameraPanOffset.z += compensatedZ * 0.02; 
     
     // Limitar el paneo
     this.cameraPanOffset.x = Math.max(-20, Math.min(20, this.cameraPanOffset.x));
@@ -243,6 +421,51 @@ export class Scene implements AfterViewInit {
     if (event.button === 0) {
       this.isPanning = false;
     }
+  }
+
+  // ===========================================
+  // 📱 CONTROLES TÁCTILES PARA CÁMARA
+  // ===========================================
+  private onTouchStart(event: TouchEvent): void {
+    if (event.touches.length === 1) { // Solo un dedo para paneo
+      this.isPanning = true;
+      this.isDetached = true;
+      this.lastMouseX = event.touches[0].clientX;
+      this.lastMouseY = event.touches[0].clientY;
+    }
+    event.preventDefault();
+  }
+
+  private onTouchMove(event: TouchEvent): void {
+    if (!this.isPanning || event.touches.length !== 1) return;
+    
+    event.preventDefault();
+    
+    // Usar la misma lógica que el mouse pero con coordenadas táctiles
+    const deltaX = event.touches[0].clientX - this.lastMouseX;
+    const deltaY = event.touches[0].clientY - this.lastMouseY;
+    this.lastMouseX = event.touches[0].clientX;
+    this.lastMouseY = event.touches[0].clientY;
+    
+    // Compensación trigonométrica para movimiento más "recto" en vista isométrica
+    const angle = Math.PI / 4;
+    const compensatedX = deltaY * Math.cos(angle) - deltaX * Math.sin(angle);
+    const compensatedZ = deltaY * Math.sin(angle) + deltaX * Math.cos(angle);
+    
+    // Aplicar movimiento compensado
+    this.cameraPanOffset.x += compensatedX * 0.02;
+    this.cameraPanOffset.z += compensatedZ * 0.02;
+    
+    // Limitar el paneo
+    this.cameraPanOffset.x = Math.max(-20, Math.min(20, this.cameraPanOffset.x));
+    this.cameraPanOffset.z = Math.max(-20, Math.min(20, this.cameraPanOffset.z));
+  }
+
+  private onTouchEnd(event: TouchEvent): void {
+    if (event.touches.length === 0) {
+      this.isPanning = false;
+    }
+    event.preventDefault();
   }
   // --- FIN Listeners ---
 
@@ -316,7 +539,16 @@ export class Scene implements AfterViewInit {
 
     // Físicas
     this.world.step(delta);
-    this.vehicle?.update(delta);
+    
+    // Preparar controles móviles si es necesario
+    const mobileControls = this.isMobile ? {
+      accelerate: this.mobileAccelerate,
+      brake: this.mobileBrake,
+      steerX: this.joystickDirection.x,
+      steerY: this.joystickDirection.y
+    } : undefined;
+    
+    this.vehicle?.update(delta, mobileControls);
     this.worldController?.update();
 
     // Actualizar cámara personalizada

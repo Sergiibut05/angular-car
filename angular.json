@@ -17,6 +17,7 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
+            "outputPath": "dist/angular-car",
             "browser": "src/main.ts",
             "polyfills": [
               "zone.js"
