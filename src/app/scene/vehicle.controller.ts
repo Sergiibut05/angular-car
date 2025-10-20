@@ -131,8 +131,8 @@ export class VehicleController {
     }as any);
     this.chassisBody.addShape(new CANNON.Box(halfExtents)); // Forma de caja para el chasis
     // 📍 POSICIONAR EL CHASIS
-    // Posición inicial alta para evitar colisiones con el suelo
-    this.chassisBody.position.set(0, this.wheelRadius + this.suspensionRestLength + halfExtents.y + 1.0, 0);
+    // Posición inicial alta para que caiga al suelo
+    this.chassisBody.position.set(0, 6.0, 0); // Aparece a 6 metros de altura
     this.chassisBody.velocity.set(0, 0, 0); // Velocidad inicial cero
     this.chassisBody.angularVelocity.set(0, 0, 0); // Velocidad angular inicial cero
     this.chassisBody.updateMassProperties(); // Actualizar propiedades de masa
@@ -157,10 +157,10 @@ export class VehicleController {
     // ===========================================
     // Posiciones relativas al centro del chasis (en metros) - Ajustadas para nuevo modelo
     const wheelPositions = [
-        [-2.3, 0, 0.8],   // Rueda delantera izquierda
-        [2.3, 0, 0.8],    // Rueda delantera derecha
-        [-2.3, 0, -0.8],  // Rueda trasera izquierda
-        [2.3, 0, -0.8]    // Rueda trasera derecha
+        [-1.2, 0, 1.5],   // Rueda delantera izquierda - Más separadas
+        [1.2, 0, 1.5],    // Rueda delantera derecha - Más separadas
+        [-1.2, 0, -1.5],  // Rueda trasera izquierda - Más separadas
+        [1.2, 0, -1.5]    // Rueda trasera derecha - Más separadas
     ];
 
     // ===========================================
@@ -215,56 +215,56 @@ export class VehicleController {
     window.addEventListener('keyup', (e) => (this.keys[e.key.toLowerCase()] = false));
   }
 
-  // ===========================================
-  // 🔄 ACTUALIZACIÓN PRINCIPAL DEL VEHÍCULO
-  // ===========================================
-  update(delta: number, mobileControls?: { accelerate: boolean, brake: boolean, steerX: number, steerY: number }) {
-    if (!this.vehicle) return; // Salir si no hay vehículo
-
-    // 🔄 Sistema de recuperación automática
-    this.updateRecovery(delta);
-
-    // 🎮 PROCESAR CONTROLES DE ENTRADA
-    let engineForce = 0; // Fuerza del motor (0 = sin aceleración)
-    let steerValue = 0;  // Valor de dirección (0 = recto)
-
-    // 📊 CALCULAR VELOCIDAD ACTUAL
-    const currentSpeedMs = this.chassisBody.velocity.length(); // Velocidad en m/s
-    const isOverMaxSpeed = currentSpeedMs > this.maxSpeedMs; // ¿Excede velocidad máxima?
-
-    // ⌨️ MAPEAR TECLAS Y CONTROLES MÓVILES A CONTROLES
-    // Aceleración hacia adelante (W, flecha arriba, o botón móvil acelerar)
-    if (((this.keys['w'] || this.keys['arrowup']) || (mobileControls?.accelerate)) && !isOverMaxSpeed) {
-      engineForce = -this.maxForce; // Negativo = hacia adelante
-    }
-    // Aceleración hacia atrás (S, flecha abajo, o botón móvil frenar)
-    if ((this.keys['s'] || this.keys['arrowdown']) || (mobileControls?.brake)) {
-      engineForce = this.maxForce; // Positivo = hacia atrás
-    }
-    
-    // Dirección izquierda (A, flecha izquierda, o joystick izquierda)
-    if ((this.keys['a'] || this.keys['arrowleft']) || (mobileControls?.steerX && mobileControls.steerX < -0.3)) {
-      steerValue = this.maxSteer; // Positivo = izquierda
-    }
-    // Dirección derecha (D, flecha derecha, o joystick derecha)
-    if ((this.keys['d'] || this.keys['arrowright']) || (mobileControls?.steerX && mobileControls.steerX > 0.3)) {
-      steerValue = -this.maxSteer; // Negativo = derecha
-    }
-
     // ===========================================
-    // ⚡ APLICAR FUERZAS AL VEHÍCULO
+    // 🔄 ACTUALIZACIÓN PRINCIPAL DEL VEHÍCULO
     // ===========================================
-    
-    // 🚗 TRACCIÓN TOTAL (4WD - Tracción en las 4 ruedas)
-    // Aplicar fuerza del motor a todas las ruedas para mejor aceleración
-    this.vehicle.applyEngineForce(engineForce, 0); // Rueda delantera izquierda
-    this.vehicle.applyEngineForce(engineForce, 1); // Rueda delantera derecha
-    this.vehicle.applyEngineForce(engineForce, 2); // Rueda trasera izquierda
-    this.vehicle.applyEngineForce(engineForce, 3); // Rueda trasera derecha
+    update(delta: number, mobileControls?: { accelerate: boolean, brake: boolean, steerX: number, steerY: number }) {
+      if (!this.vehicle) return; // Salir si no hay vehículo
 
-    // 🎯 DIRECCIÓN (Solo ruedas delanteras)
-    this.vehicle.setSteeringValue(steerValue, 0); // Rueda delantera izquierda
-    this.vehicle.setSteeringValue(steerValue, 1); // Rueda delantera derecha
+        // 🔄 Sistema de recuperación automática
+      this.updateRecovery(delta);
+
+      // 🎮 PROCESAR CONTROLES DE ENTRADA
+      let engineForce = 0; // Fuerza del motor (0 = sin aceleración)
+      let steerValue = 0;  // Valor de dirección (0 = recto)
+
+      // 📊 CALCULAR VELOCIDAD ACTUAL
+      const currentSpeedMs = this.chassisBody.velocity.length(); // Velocidad en m/s
+      const isOverMaxSpeed = currentSpeedMs > this.maxSpeedMs; // ¿Excede velocidad máxima?
+
+      // ⌨️ MAPEAR TECLAS Y CONTROLES MÓVILES A CONTROLES
+      // Aceleración hacia adelante (W, flecha arriba, o botón móvil acelerar)
+      if (((this.keys['w'] || this.keys['arrowup']) || (mobileControls?.accelerate)) && !isOverMaxSpeed) {
+        engineForce = -this.maxForce; // Negativo = hacia adelante
+      }
+      // Aceleración hacia atrás (S, flecha abajo, o botón móvil frenar)
+      if ((this.keys['s'] || this.keys['arrowdown']) || (mobileControls?.brake)) {
+        engineForce = this.maxForce; // Positivo = hacia atrás
+      }
+      
+      // Dirección izquierda (A, flecha izquierda, o joystick izquierda)
+      if ((this.keys['a'] || this.keys['arrowleft']) || (mobileControls?.steerX && mobileControls.steerX < -0.3)) {
+        steerValue = this.maxSteer; // Positivo = izquierda
+      }
+      // Dirección derecha (D, flecha derecha, o joystick derecha)
+      if ((this.keys['d'] || this.keys['arrowright']) || (mobileControls?.steerX && mobileControls.steerX > 0.3)) {
+        steerValue = -this.maxSteer; // Negativo = derecha
+      }
+
+      // ===========================================
+      // ⚡ APLICAR FUERZAS AL VEHÍCULO
+      // ===========================================
+      
+      // 🚗 TRACCIÓN TOTAL (4WD - Tracción en las 4 ruedas)
+      // Aplicar fuerza del motor a todas las ruedas para mejor aceleración
+      this.vehicle.applyEngineForce(engineForce, 0); // Rueda delantera izquierda
+      this.vehicle.applyEngineForce(engineForce, 1); // Rueda delantera derecha
+      this.vehicle.applyEngineForce(engineForce, 2); // Rueda trasera izquierda
+      this.vehicle.applyEngineForce(engineForce, 3); // Rueda trasera derecha
+
+      // 🎯 DIRECCIÓN (Solo ruedas delanteras)
+      this.vehicle.setSteeringValue(steerValue, 0); // Rueda delantera izquierda
+      this.vehicle.setSteeringValue(steerValue, 1); // Rueda delantera derecha
 
     // ===========================================
     // 🎨 SINCRONIZACIÓN VISUAL

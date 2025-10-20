@@ -166,14 +166,31 @@ export class Scene implements AfterViewInit {
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.rendererCanvas.nativeElement,
-      antialias: true
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance"
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limitar pixel ratio para móviles
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Suavizado de sombras
     this.renderer.shadowMap.autoUpdate = true; // Actualización automática
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
+    
+    // ===========================================
+    // 🎨 CONFIGURACIÓN AVANZADA DE RENDERIZADO
+    // ===========================================
+    
+    // 🔧 ANTIALIASING Y CALIDAD
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace; // Espacio de color estándar
+    
+    // 📱 OPTIMIZACIÓN PARA MÓVILES
+    this.renderer.capabilities.logarithmicDepthBuffer = true; // Buffer de profundidad logarítmico
+    this.renderer.sortObjects = true; // Ordenar objetos para mejor rendimiento
+    
+    // 🎯 CONFIGURACIÓN DE SOMBRAS OPTIMIZADA
+    this.renderer.shadowMap.needsUpdate = true;
 
     // ===========================================
     // 🌞 CONFIGURACIÓN AVANZADA DE SOMBRAS
@@ -182,9 +199,12 @@ export class Scene implements AfterViewInit {
     sunLight.position.set(30, 40, 20); // Posición del sol más alta
     sunLight.castShadow = true;
     
-    // 🎯 RESOLUCIÓN ULTRA ALTA DE SOMBRAS
-    sunLight.shadow.mapSize.width = 16384; // Resolución máxima
-    sunLight.shadow.mapSize.height = 16384;
+    // 🎯 RESOLUCIÓN ADAPTATIVA DE SOMBRAS (Optimizada para móviles)
+    const isMobile = window.innerWidth <= 768 || window.innerHeight <= 768;
+    const shadowResolution = isMobile ? 4096 : 8192; // Resolución adaptativa
+    
+    sunLight.shadow.mapSize.width = shadowResolution;
+    sunLight.shadow.mapSize.height = shadowResolution;
     
     // 📐 CONFIGURACIÓN DE CÁMARA DE SOMBRAS
     sunLight.shadow.camera.near = 0.1;
@@ -197,10 +217,8 @@ export class Scene implements AfterViewInit {
     // 🎨 FILTROS DE SUAVIZADO AVANZADOS
     sunLight.shadow.bias = -0.00005; // Bias muy pequeño para reducir artefactos
     sunLight.shadow.normalBias = 0.08; // Normal bias aumentado para suavizar bordes
-    sunLight.shadow.radius = 12; // Radio de suavizado aumentado
-    
-    // 🔧 CONFIGURACIÓN ADICIONAL PARA CALIDAD
-    sunLight.shadow.blurSamples = 25; // Más muestras para mejor calidad
+    sunLight.shadow.radius = isMobile ? 8 : 12; // Radio adaptativo
+    sunLight.shadow.blurSamples = isMobile ? 15 : 25; // Muestras adaptativas
     sunLight.shadow.updateMatrices(sunLight); // Actualizar matrices
 
     this.scene.add(sunLight);
@@ -242,14 +260,17 @@ export class Scene implements AfterViewInit {
     const renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(renderPass);
 
-    this.bokehPass = new BokehPass(this.scene, this.camera, {
-      focus: 25.0,      // Distancia de enfoque aumentada
-      aperture: 0.00005, // Desenfoque más notable
-      maxblur: 0.002,   // Desenfoque máximo más visible en bordes
-      width: window.innerWidth,
-      height: window.innerHeight
-    } as any);
-    this.composer.addPass(this.bokehPass);
+    // 🎯 POST-PROCESADO ADAPTATIVO PARA MÓVILES
+    if (!isMobile) { // Solo aplicar en desktop para mejor rendimiento
+      this.bokehPass = new BokehPass(this.scene, this.camera, {
+        focus: 25.0,      // Distancia de enfoque aumentada
+        aperture: 0.00005, // Desenfoque más notable
+        maxblur: 0.002,   // Desenfoque máximo más visible en bordes
+        width: window.innerWidth,
+        height: window.innerHeight
+      } as any);
+      this.composer.addPass(this.bokehPass);
+    }
     // -----------------------------------------------------------
   }
 
@@ -269,6 +290,9 @@ export class Scene implements AfterViewInit {
     // Listeners de teclado para detectar conducción
     window.addEventListener('keydown', (e) => (this.keys[e.key.toLowerCase()] = true));
     window.addEventListener('keyup', (e) => (this.keys[e.key.toLowerCase()] = false));
+    
+    // 🖥️ LISTENER PARA REDIMENSIONAR VENTANA
+    window.addEventListener('resize', this.onWindowResize.bind(this));
   }
 
   // ===========================================
@@ -532,6 +556,32 @@ export class Scene implements AfterViewInit {
 
   // --- FIN Bucle de cámara ---
 
+  // ===========================================
+  // 🖥️ MANEJO DE REDIMENSIONADO DE VENTANA
+  // ===========================================
+  private onWindowResize(): void {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    
+    // Actualizar cámara
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    
+    // Actualizar renderer
+    this.renderer.setSize(width, height);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    
+    // Actualizar composer si existe
+    if (this.composer) {
+      this.composer.setSize(width, height);
+    }
+    
+    // Actualizar bokeh pass si existe
+    if (this.bokehPass) {
+      (this.bokehPass as any).uniforms['aspect'].value = width / height;
+    }
+  }
+
   private animate(): void {
     requestAnimationFrame(() => this.animate());
 
@@ -555,6 +605,10 @@ export class Scene implements AfterViewInit {
     this.updateCamera(delta);
  
     // this.renderer.render(this.scene, this.camera); // --- ARREGLO: Reemplazado por el composer ---
-    this.composer.render(); // Usa el composer para renderizar con el efecto de desenfoque
+    if (this.bokehPass) {
+      this.composer.render(); // Usa el composer para renderizar con el efecto de desenfoque
+    } else {
+      this.renderer.render(this.scene, this.camera); // Renderizado directo para móviles
+    }
   }
 }
