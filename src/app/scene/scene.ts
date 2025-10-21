@@ -70,6 +70,10 @@ export class Scene implements AfterViewInit {
   private lastMouseX = 0;
   private lastMouseY = 0;
   
+  // Variables para pinch-to-zoom en móviles
+  private lastPinchDistance = 0;
+  private isPinching = false;
+  
   // Controles del coche
   private keys: { [key: string]: boolean } = {};
   
@@ -176,7 +180,10 @@ export class Scene implements AfterViewInit {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Suavizado de sombras
     this.renderer.shadowMap.autoUpdate = true; // Actualización automática
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    
+    // 💡 Exposición más alta para look más claro (como móvil)
+    const isMobileDevice = window.innerWidth <= 768 || window.innerHeight <= 768;
+    this.renderer.toneMappingExposure = isMobileDevice ? 1.0 : 1.4; // PC más claro
     
     // ===========================================
     // 🎨 CONFIGURACIÓN AVANZADA DE RENDERIZADO
@@ -199,9 +206,9 @@ export class Scene implements AfterViewInit {
     sunLight.position.set(30, 40, 20); // Posición del sol más alta
     sunLight.castShadow = true;
     
-    // 🎯 RESOLUCIÓN ADAPTATIVA DE SOMBRAS (Optimizada para móviles)
+    // 🎯 RESOLUCIÓN DE SOMBRAS (Unificada para mejor look)
     const isMobile = window.innerWidth <= 768 || window.innerHeight <= 768;
-    const shadowResolution = isMobile ? 4096 : 8192; // Resolución adaptativa
+    const shadowResolution = 4096; // Resolución unificada (mismo look móvil/PC)
     
     sunLight.shadow.mapSize.width = shadowResolution;
     sunLight.shadow.mapSize.height = shadowResolution;
@@ -214,11 +221,11 @@ export class Scene implements AfterViewInit {
     sunLight.shadow.camera.top = 150;
     sunLight.shadow.camera.bottom = -150;
     
-    // 🎨 FILTROS DE SUAVIZADO AVANZADOS
+    // 🎨 FILTROS DE SUAVIZADO (Valores de móvil para look consistente)
     sunLight.shadow.bias = -0.00005; // Bias muy pequeño para reducir artefactos
     sunLight.shadow.normalBias = 0.08; // Normal bias aumentado para suavizar bordes
-    sunLight.shadow.radius = isMobile ? 8 : 12; // Radio adaptativo
-    sunLight.shadow.blurSamples = isMobile ? 15 : 25; // Muestras adaptativas
+    sunLight.shadow.radius = 8; // Radio suave
+    sunLight.shadow.blurSamples = 15; // Muestras de blur
     sunLight.shadow.updateMatrices(sunLight); // Actualizar matrices
 
     this.scene.add(sunLight);
@@ -255,22 +262,23 @@ export class Scene implements AfterViewInit {
     this.world.addContactMaterial(carWorldContact);
     // ------------------------------------
     
-    // --- ARREGLO: Configuración de Post-Procesado (Desenfoque) ---
+    // --- ARREGLO: Configuración de Post-Procesado (DESACTIVADO para look limpio) ---
     this.composer = new EffectComposer(this.renderer);
     const renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(renderPass);
 
-    // 🎯 POST-PROCESADO ADAPTATIVO PARA MÓVILES
-    if (!isMobile) { // Solo aplicar en desktop para mejor rendimiento
-      this.bokehPass = new BokehPass(this.scene, this.camera, {
-        focus: 25.0,      // Distancia de enfoque aumentada
-        aperture: 0.00005, // Desenfoque más notable
-        maxblur: 0.002,   // Desenfoque máximo más visible en bordes
-        width: window.innerWidth,
-        height: window.innerHeight
-      } as any);
-      this.composer.addPass(this.bokehPass);
-    }
+    // 🎯 POST-PROCESADO DESACTIVADO - Mismo look limpio en PC y móvil
+    // El efecto Bokeh oscurecía la imagen en PC
+    // if (!isMobile) {
+    //   this.bokehPass = new BokehPass(this.scene, this.camera, {
+    //     focus: 25.0,
+    //     aperture: 0.00005,
+    //     maxblur: 0.002,
+    //     width: window.innerWidth,
+    //     height: window.innerHeight
+    //   } as any);
+    //   this.composer.addPass(this.bokehPass);
+    // }
     // -----------------------------------------------------------
   }
 
@@ -451,43 +459,81 @@ export class Scene implements AfterViewInit {
   // 📱 CONTROLES TÁCTILES PARA CÁMARA
   // ===========================================
   private onTouchStart(event: TouchEvent): void {
-    if (event.touches.length === 1) { // Solo un dedo para paneo
+    if (event.touches.length === 1) {
+      // Un dedo: paneo de cámara
       this.isPanning = true;
       this.isDetached = true;
+      this.isPinching = false;
       this.lastMouseX = event.touches[0].clientX;
       this.lastMouseY = event.touches[0].clientY;
+    } else if (event.touches.length === 2) {
+      // Dos dedos: zoom (pinch)
+      this.isPinching = true;
+      this.isPanning = false;
+      
+      const touch1 = event.touches[0];
+      const touch2 = event.touches[1];
+      const dx = touch2.clientX - touch1.clientX;
+      const dy = touch2.clientY - touch1.clientY;
+      this.lastPinchDistance = Math.sqrt(dx * dx + dy * dy);
     }
     event.preventDefault();
   }
 
   private onTouchMove(event: TouchEvent): void {
-    if (!this.isPanning || event.touches.length !== 1) return;
-    
     event.preventDefault();
     
-    // Usar la misma lógica que el mouse pero con coordenadas táctiles
-    const deltaX = event.touches[0].clientX - this.lastMouseX;
-    const deltaY = event.touches[0].clientY - this.lastMouseY;
-    this.lastMouseX = event.touches[0].clientX;
-    this.lastMouseY = event.touches[0].clientY;
-    
-    // Compensación trigonométrica para movimiento más "recto" en vista isométrica
-    const angle = Math.PI / 4;
-    const compensatedX = deltaY * Math.cos(angle) - deltaX * Math.sin(angle);
-    const compensatedZ = deltaY * Math.sin(angle) + deltaX * Math.cos(angle);
-    
-    // Aplicar movimiento compensado
-    this.cameraPanOffset.x += compensatedX * 0.02;
-    this.cameraPanOffset.z += compensatedZ * 0.02;
-    
-    // Limitar el paneo
-    this.cameraPanOffset.x = Math.max(-20, Math.min(20, this.cameraPanOffset.x));
-    this.cameraPanOffset.z = Math.max(-20, Math.min(20, this.cameraPanOffset.z));
+    if (event.touches.length === 1 && this.isPanning && !this.isPinching) {
+      // Un dedo: paneo
+      const deltaX = event.touches[0].clientX - this.lastMouseX;
+      const deltaY = event.touches[0].clientY - this.lastMouseY;
+      this.lastMouseX = event.touches[0].clientX;
+      this.lastMouseY = event.touches[0].clientY;
+      
+      // Compensación trigonométrica para movimiento más "recto" en vista isométrica
+      const angle = Math.PI / 4;
+      const compensatedX = deltaY * Math.cos(angle) - deltaX * Math.sin(angle);
+      const compensatedZ = deltaY * Math.sin(angle) + deltaX * Math.cos(angle);
+      
+      // Aplicar movimiento compensado
+      this.cameraPanOffset.x += compensatedX * 0.02;
+      this.cameraPanOffset.z += compensatedZ * 0.02;
+      
+      // Limitar el paneo
+      this.cameraPanOffset.x = Math.max(-20, Math.min(20, this.cameraPanOffset.x));
+      this.cameraPanOffset.z = Math.max(-20, Math.min(20, this.cameraPanOffset.z));
+    } else if (event.touches.length === 2 && this.isPinching) {
+      // Dos dedos: zoom (pinch)
+      const touch1 = event.touches[0];
+      const touch2 = event.touches[1];
+      const dx = touch2.clientX - touch1.clientX;
+      const dy = touch2.clientY - touch1.clientY;
+      const currentDistance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (this.lastPinchDistance > 0) {
+        // Calcular el cambio de distancia
+        const delta = currentDistance - this.lastPinchDistance;
+        const zoomAmount = delta * 0.005; // Sensibilidad del zoom
+        
+        // Aplicar zoom
+        this.cameraScrollZoom = Math.max(0.8, Math.min(1.5, this.cameraScrollZoom - zoomAmount));
+      }
+      
+      this.lastPinchDistance = currentDistance;
+    }
   }
 
   private onTouchEnd(event: TouchEvent): void {
     if (event.touches.length === 0) {
       this.isPanning = false;
+      this.isPinching = false;
+      this.lastPinchDistance = 0;
+    } else if (event.touches.length === 1) {
+      // Si queda un dedo, reiniciar para paneo
+      this.isPinching = false;
+      this.lastPinchDistance = 0;
+      this.lastMouseX = event.touches[0].clientX;
+      this.lastMouseY = event.touches[0].clientY;
     }
     event.preventDefault();
   }
@@ -500,16 +546,20 @@ export class Scene implements AfterViewInit {
 
     const carPos = this.vehicle.chassisBody.position;
 
-    // Detectar si el usuario está conduciendo
+    // Detectar si el usuario está conduciendo (teclado o controles móviles)
     const isDriving = this.keys['w'] || this.keys['arrowup'] || 
                      this.keys['s'] || this.keys['arrowdown'] ||
                      this.keys['a'] || this.keys['arrowleft'] ||
-                     this.keys['d'] || this.keys['arrowright'];
+                     this.keys['d'] || this.keys['arrowright'] ||
+                     this.mobileAccelerate || this.mobileBrake || 
+                     (Math.abs(this.joystickDirection.x) > 0.1) ||
+                     (Math.abs(this.joystickDirection.y) > 0.1);
 
     // Si está conduciendo, reconectar automáticamente la cámara al coche
     if (isDriving && this.isDetached) {
       this.isDetached = false;
       this.isPanning = false;
+      this.isPinching = false;
     }
 
     // Actualizar posición del coche solo si no está desconectada
@@ -548,10 +598,12 @@ export class Scene implements AfterViewInit {
     this.camera.position.lerp(idealPos, delta * 3.0);
     this.camera.lookAt(this.cameraTarget);
 
-    // DoF muy sutil solo en bordes
-    const distance = this.camera.position.distanceTo(carPos as any);
-    (this.bokehPass.uniforms as any)['focus'].value = distance;
-    (this.bokehPass.uniforms as any)['aperture'].value = 0.000005 * Math.max(1, distance / 25.0);
+    // DoF muy sutil solo en bordes (solo si bokehPass existe - desktop)
+    if (this.bokehPass) {
+      const distance = this.camera.position.distanceTo(carPos as any);
+      (this.bokehPass.uniforms as any)['focus'].value = distance;
+      (this.bokehPass.uniforms as any)['aperture'].value = 0.000005 * Math.max(1, distance / 25.0);
+    }
   }
 
   // --- FIN Bucle de cámara ---
@@ -604,11 +656,7 @@ export class Scene implements AfterViewInit {
     // Actualizar cámara personalizada
     this.updateCamera(delta);
  
-    // this.renderer.render(this.scene, this.camera); // --- ARREGLO: Reemplazado por el composer ---
-    if (this.bokehPass) {
-      this.composer.render(); // Usa el composer para renderizar con el efecto de desenfoque
-    } else {
-      this.renderer.render(this.scene, this.camera); // Renderizado directo para móviles
-    }
+    // Renderizado directo (mismo en PC y móvil para look consistente)
+    this.renderer.render(this.scene, this.camera);
   }
 }

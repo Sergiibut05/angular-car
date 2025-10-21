@@ -20,7 +20,7 @@ canvas {
 // 🎮 JOYSTICK (esquina inferior izquierda)
 .joystick-container {
     position: absolute;
-    bottom: 20px;
+    bottom: 80px; // Subido para que no lo tape la barra inferior del móvil
     left: 20px;
     width: 120px;
     height: 120px;
@@ -49,6 +49,11 @@ canvas {
     position: absolute;
     transition: transform 0.1s ease;
     cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    outline: none;
     
     &:active {
         cursor: grabbing;
@@ -59,7 +64,7 @@ canvas {
 // 🎯 BOTONES (esquina inferior derecha)
 .mobile-buttons {
     position: absolute;
-    bottom: 20px;
+    bottom: 80px; // Subido para que no lo tape la barra inferior del móvil
     right: 20px;
     display: flex;
     flex-direction: column;
@@ -85,6 +90,12 @@ canvas {
     cursor: pointer;
     transition: all 0.2s ease;
     user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
     
     span:first-child {
         font-size: 24px;
@@ -98,6 +109,10 @@ canvas {
     &:active {
         transform: scale(0.95);
         background: rgba(255, 255, 255, 0.4);
+    }
+    
+    &:focus {
+        outline: none;
     }
 }
 
@@ -120,7 +135,7 @@ canvas {
     .joystick-container {
         width: 100px;
         height: 100px;
-        bottom: 15px;
+        bottom: 70px; // Subido también en móviles
         left: 15px;
     }
     
@@ -130,7 +145,7 @@ canvas {
     }
     
     .mobile-buttons {
-        bottom: 15px;
+        bottom: 70px; // Subido también en móviles
         right: 15px;
         gap: 12px;
     }

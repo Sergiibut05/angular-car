@@ -107,46 +107,62 @@ export class WorldController {
     });
   }
 
-  // 🧱 Objetos estáticos chocables
+  // 🧱 Objetos estáticos chocables - OPTIMIZADO PARA RENDIMIENTO
   private createStaticCollidableObject(mesh: THREE.Mesh): void {
-    console.log(`🔧 Creando objeto chocable: ${mesh.name}`);
-    
-    // Obtener posición y escala mundiales
+    // Obtener transformaciones mundiales
     mesh.updateWorldMatrix(true, false);
     const worldPosition = new THREE.Vector3();
+    const worldQuaternion = new THREE.Quaternion();
     const worldScale = new THREE.Vector3();
     mesh.getWorldPosition(worldPosition);
+    mesh.getWorldQuaternion(worldQuaternion);
     mesh.getWorldScale(worldScale);
 
-    // Obtener bounding box con escala mundial aplicada
-    const geometry = mesh.geometry.clone();
-    geometry.scale(worldScale.x, worldScale.y, worldScale.z);
-    const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes['position'] as THREE.BufferAttribute);
-    const size = box.getSize(new THREE.Vector3());
-
-    // Crear collider Box
+    // Calcular bounding box en espacio local
+    mesh.geometry.computeBoundingBox();
+    const bbox = mesh.geometry.boundingBox!;
+    
+    // Tamaño y centro en espacio local
+    const localSize = new THREE.Vector3();
+    bbox.getSize(localSize);
+    const localCenter = new THREE.Vector3();
+    bbox.getCenter(localCenter);
+    
+    // Aplicar escala al tamaño y centro
+    localSize.multiply(worldScale);
+    localCenter.multiply(worldScale);
+    
+    // Crear shape de caja con dimensiones del bounding box escaladas
     const halfExtents = new CANNON.Vec3(
-      Math.max(0.1, size.x / 2),
-      Math.max(0.1, size.y / 2), 
-      Math.max(0.1, size.z / 2)
+      Math.max(0.05, localSize.x / 2),
+      Math.max(0.05, localSize.y / 2),
+      Math.max(0.05, localSize.z / 2)
     );
 
+    // Crear cuerpo físico estático con rotación
     const body = new CANNON.Body({
-      mass: 0, // Estático
+      mass: 0,
       material: worldMaterial,
+      type: CANNON.Body.STATIC,
       position: new CANNON.Vec3(worldPosition.x, worldPosition.y, worldPosition.z),
-      type: CANNON.Body.KINEMATIC
+      quaternion: new CANNON.Quaternion(
+        worldQuaternion.x,
+        worldQuaternion.y,
+        worldQuaternion.z,
+        worldQuaternion.w
+      )
     });
 
-    body.addShape(new CANNON.Box(halfExtents));
+    // Agregar shape con offset al centro local (la rotación del body ya se aplicará)
+    const boxShape = new CANNON.Box(halfExtents);
+    body.addShape(boxShape, new CANNON.Vec3(localCenter.x, localCenter.y, localCenter.z));
+
     this.world.addBody(body);
     this.physicsBodies.push(body);
 
     // Configurar sombras
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-
-    console.log(`✅ Objeto chocable creado: ${mesh.name}`);
   }
 
   // 🌀 Actualizar (no hay objetos dinámicos que sincronizar)
